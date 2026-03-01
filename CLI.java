@@ -3,10 +3,6 @@ import java.util.Random;
 import java.util.Comparator;
 import java.util.Arrays;
 
-/**
- * CLI driver: (1) Parses jar-style args: --type=int --dist=random --n=50000 --algo=heap etc.
- *             (2) Interactive mode: follows introductory flow (Hello user, type s/i, N, search/sort).
- */
 public class CLI {
     public static void main(String[] args) {
         if (args.length > 0 && args[0].startsWith("--")) {
@@ -81,7 +77,6 @@ public class CLI {
                 " comparisons=" + bs.getComparisons() + " time=" + time + " ms");
             System.out.println("Correct: " + (idx >= 0 ? arr[idx] == key : true));
         } else {
-            // linear on unsorted copy would be fair; here we use sorted and still run linear for demo
             int[] copy = arr.clone();
             shuffle(copy);
             LinearSearch ls = new LinearSearch();
@@ -226,7 +221,7 @@ public class CLI {
         }
     }
 
-    // ---------- Interactive mode (follows your introductory CLI) ----------
+   
     private static void runInteractive() {
         Scanner kb = new Scanner(System.in);
         Random r = new Random();

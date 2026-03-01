@@ -1,10 +1,5 @@
 import java.util.Comparator;
 
-/**
- * Binary search on a sorted array (iterative and recursive).
- * Precondition: array must be sorted. Returns index or -1 if not found.
- * Counts comparisons.
- */
 public class BinarySearch {
     private long comparisons;
 
