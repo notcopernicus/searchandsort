@@ -1,7 +1,12 @@
-import java.util.Scanner;
-import java.util.Random;
-import java.util.Comparator;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Random;
+import java.util.Scanner;
 
 public class CLI {
     public static void main(String[] args) {
@@ -19,6 +24,14 @@ public class CLI {
         String algo = getArg(args, "algo", "");
         String search = getArg(args, "search", "");
         String keyStr = getArg(args, "key", "");
+        boolean outputCsv = hasFlag(args, "csv");
+        String outFile = getArg(args, "out", "");
+        boolean benchmark = hasFlag(args, "benchmark");
+
+        if (benchmark) {
+            runBenchmark(outFile.isEmpty() ? "benchmark_results.csv" : outFile);
+            return;
+        }
 
         DataGenerator gen = new DataGenerator();
         DataGenerator.Distribution d = parseDist(dist);
@@ -27,8 +40,41 @@ public class CLI {
             runSearchFromArgs(type, dist, n, search, keyStr, gen, d);
         } else {
             if (algo.isEmpty()) algo = "heap";
-            runSortFromArgs(type, dist, n, algo, gen, d);
+            runSortFromArgs(type, dist, n, algo, gen, d, outputCsv, outFile);
         }
+    }
+
+    /** Run many (N, distribution, algorithm) combinations and write one CSV for empirical comparison. */
+    private static void runBenchmark(String outPath) {
+        int[] sizes = { 1000, 5000, 10000, 20000, 50000 };
+        String[] dists = { "random", "nearly-sorted", "reverse", "high-duplicate" };
+        String[] algos = { "selection", "insertion", "heap", "merge", "quick" };
+        DataGenerator gen = new DataGenerator();
+        List<RunResult> results = new ArrayList<>();
+        for (int n : sizes) {
+            for (String dist : dists) {
+                DataGenerator.Distribution d = parseDist(dist);
+                for (String algo : algos) {
+                    int[] a = gen.generateInts(n, d);
+                    RunResult r = runIntSort(a, algo, dist);
+                    results.add(r);
+                    System.err.println("Ran n=" + n + " dist=" + dist + " algo=" + algo + " -> " + r.timeMs + " ms");
+                }
+            }
+        }
+        try (PrintWriter w = new PrintWriter(new FileWriter(outPath))) {
+            w.println(RunResult.csvHeader());
+            for (RunResult r : results) w.println(r.toCsvRow());
+        } catch (Exception e) {
+            System.err.println("Benchmark write failed: " + e.getMessage());
+            return;
+        }
+        System.out.println("Wrote " + results.size() + " rows to " + outPath);
+    }
+
+    private static boolean hasFlag(String[] args, String name) {
+        for (String a : args) if (("--" + name).equals(a)) return true;
+        return false;
     }
 
     private static void runSearchFromArgs(String type, String dist, int n, String search, String keyStr,
@@ -44,24 +90,25 @@ public class CLI {
             String key = keyStr.isEmpty() ? (arr.length > 0 ? arr[arr.length / 2] : "Apple") : keyStr;
             runStringSearch(arr, key, search);
         } else {
-            System.out.println("Search with --type=int or --type=string only for this CLI.");
+            System.out.println("Search with int or string only for this CLI.");
         }
     }
 
     private static void runSortFromArgs(String type, String dist, int n, String algo,
-                                        DataGenerator gen, DataGenerator.Distribution d) {
+                                        DataGenerator gen, DataGenerator.Distribution d,
+                                        boolean outputCsv, String outFile) {
         if ("int".equalsIgnoreCase(type)) {
             int[] a = gen.generateInts(n, d);
             RunResult r = runIntSort(a, algo, dist);
-            printResult(r);
+            printResult(r, outputCsv, outFile);
         } else if ("string".equalsIgnoreCase(type)) {
             String[] a = gen.generateStrings(n, d);
             RunResult r = runStringSort(a, algo, dist);
-            printResult(r);
+            printResult(r, outputCsv, outFile);
         } else if ("record".equalsIgnoreCase(type) || "student".equalsIgnoreCase(type)) {
             Student[] a = gen.generateStudents(n, d);
             RunResult r = runStudentSort(a, algo, dist);
-            printResult(r);
+            printResult(r, outputCsv, outFile);
         } else {
             System.out.println("Unknown type: " + type + ". Use int, string, or record.");
         }
@@ -200,9 +247,22 @@ public class CLI {
         }
     }
 
-    private static void printResult(RunResult r) {
-        System.out.println(RunResult.tableHeader());
-        System.out.println(r.toTableRow());
+    private static void printResult(RunResult r, boolean csv, String outFile) {
+        if (outFile != null && !outFile.isEmpty()) {
+            try (PrintWriter w = new PrintWriter(new File(outFile))) {
+                w.println(RunResult.csvHeader());
+                w.println(r.toCsvRow());
+            } catch (Exception e) {
+                System.err.println("Could not write to " + outFile + ": " + e.getMessage());
+            }
+        }
+        if (csv) {
+            System.out.println(RunResult.csvHeader());
+            System.out.println(r.toCsvRow());
+        } else if (outFile == null || outFile.isEmpty()) {
+            System.out.println(RunResult.tableHeader());
+            System.out.println(r.toTableRow());
+        }
     }
 
     private static void shuffle(int[] a) {
